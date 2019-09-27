@@ -207,6 +207,50 @@ def prepare_squirrel_ai(min_interactions_per_user):
     train_df.to_csv(os.path.join(data_path, f"preprocessed_data.csv"), sep="\t", index=False)
     test_df.to_csv(os.path.join(data_path, f"preprocessed_data_test.csv"), sep="\t", index=False)
 
+def prepare_lalilo(min_interactions_per_user):
+    data_path = os.path.join("data", "lalilo")
+    df = pd.read_csv(os.path.join(data_path, "data.csv"))
+    def add_exercise_code_level_lesson(df) -> pd.DataFrame:
+        dataset = df.copy()
+        dataset["exercise_code_level_lesson"] = (
+            dataset["exercise_code"].map(str)
+            + "_"
+            + dataset["level"].map(str)
+            + "_lesson_"
+            + dataset["lesson_id"].map(str)
+        )
+        return dataset
+    df = add_exercise_code_level_lesson(df)
+
+    df = df.rename(columns={"created_at": "timestamp", "exercise_code": "skill_id", "exercise_code_level_lesson": "item_id", "correctness": "correct"})
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["timestamp"] = df["timestamp"].apply(lambda x: x.total_seconds()).astype(np.int64)
+    df["timestamp"] = df["timestamp"] - df["timestamp"].min()
+
+    # Filter too short sequences
+    df = df.groupby("user_id").filter(lambda x: len(x) >= min_interactions_per_user)
+
+    # Remove continuous outcomes
+    df = df[df["correct"].isin([0, 1])]
+    df["correct"] = df["correct"].astype(np.int32)
+    
+    # Maybe we want to store the correspondence with the original dataset somewhere
+    df["user_id"] = np.unique(df["user_id"], return_inverse=True)[1]
+    df["item_id"] = np.unique(df["item_id"], return_inverse=True)[1]
+    df["skill_id"] = np.unique(df["skill_id"], return_inverse=True)[1]
+
+    # Build Q-matrix
+    Q_mat = np.zeros((len(df["item_id"].unique()), len(df["skill_id"].unique())))
+    for item_id, skill_id in df[["item_id", "skill_id"]].values:
+        Q_mat[item_id, skill_id] = 1
+
+
+    df = df[['user_id', 'item_id', 'timestamp', 'correct']]
+    df.reset_index(inplace=True, drop=True)
+
+    # Save data
+    sparse.save_npz(os.path.join(data_path, "q_mat.npz"), sparse.csr_matrix(Q_mat))
+    df.to_csv(os.path.join(data_path, "preprocessed_data.csv"), sep="\t", index=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Prepare datasets.')
@@ -235,3 +279,5 @@ if __name__ == "__main__":
     elif args.dataset == "squirrel_ai":
         prepare_squirrel_ai(
             min_interactions_per_user=args.min_interactions)
+    elif args.dataset == "lalilo":
+        prepare_lalilo(min_interactions_per_user=args.min_interactions)
