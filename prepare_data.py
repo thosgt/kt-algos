@@ -209,7 +209,7 @@ def prepare_squirrel_ai(min_interactions_per_user):
 
 def prepare_lalilo(min_interactions_per_user):
     data_path = os.path.join("data", "lalilo")
-    df = pd.read_csv(os.path.join(data_path, "data.csv"))
+    df = pd.read_csv(os.path.join(data_path, "shorter_training.csv"))
     def add_exercise_code_level_lesson(df) -> pd.DataFrame:
         dataset = df.copy()
         dataset["exercise_code_level_lesson"] = (
@@ -222,10 +222,11 @@ def prepare_lalilo(min_interactions_per_user):
         return dataset
     df = add_exercise_code_level_lesson(df)
 
-    df = df.rename(columns={"created_at": "timestamp", "exercise_code": "skill_id", "exercise_code_level_lesson": "item_id", "correctness": "correct"})
+    df = df.rename(columns={"user_id":"student_id", "created_at": "timestamp", "exercise_code": "skill_id", "exercise_code_level_lesson": "item_id", "correctness": "correct"})
     df["timestamp"] = pd.to_datetime(df["timestamp"])
-    df["timestamp"] = df["timestamp"].apply(lambda x: x.total_seconds()).astype(np.int64)
     df["timestamp"] = df["timestamp"] - df["timestamp"].min()
+    df["timestamp"] = df["timestamp"].apply(lambda x: x.total_seconds()).astype(np.int64)
+
 
     # Filter too short sequences
     df = df.groupby("user_id").filter(lambda x: len(x) >= min_interactions_per_user)
