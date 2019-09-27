@@ -4,7 +4,10 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 from sklearn.preprocessing import OneHotEncoder
+from tqdm import tqdm
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 def phi(x):
     return np.log(1 + x)
@@ -30,7 +33,7 @@ def df_to_sparse(df, Q_mat, active_features, num_prev_interactions):
     onehot_items = OneHotEncoder(num_items)
     features = None
 
-    for user_id in df["user_id"].unique():
+    for user_id in tqdm(df["user_id"].unique()):
         df_user = df[df["user_id"] == user_id][["user_id", "item_id", "timestamp", "correct"]].copy()
         df_user = df_user.values
         num_items_user = df_user.shape[0]
